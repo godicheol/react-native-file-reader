@@ -64,10 +64,7 @@ function getBase64Size(base64) {
     var p = (base64.charAt(base64.length - 2) === "\=") ? 2 : ((base64.charAt(base64.length - 1) === "\=") ? 1 : 0);
     return l * 0.75 - p;
 }
-function getName(str) {
-    return str.split("\/").pop();
-}
-function getMimetype(str) {
+function parsePath(str) {
     const types = {
         'abs': 'audio/x-mpeg',
         'ai': 'application/postscript',
@@ -247,14 +244,29 @@ function getMimetype(str) {
         'zip': 'application/zip'
     };
 
-    if (typeof(str) === "string") {
-        if (/\/{0,1}.+\..+$/.test(str)) {
-            return types[str.split("\.").pop()];
-        } else {
-            return types[str];
-        }
+    var fileName, extension, mimeType, isDirectory, isFile;
+    fileName = str.replace(/\/$/, "").split("\/").pop();
+    if (/^[^.]{1,}\.[0-9A-Za-z.]{1,}$/.test(fileName)) {
+        extension = fileName.split("\.").slice(1).join("\.");
+        isFile = true;
+        isDirectory = false;
+        baseName = fileName.replace("\."+extension, "");
+        mimeType = types[extension] ? types[extension] : null;
+        extension = "\."+extension;
     } else {
-        return undefined;
+        extension = null;
+        isFile = false;
+        isDirectory = true;
+        baseName = fileName;
+        mimeType = null;
+    }
+    return {
+        fileName: fileName,
+        baseName: baseName,
+        extension: extension,
+        mimeType: mimeType,
+        isFile: isFile,
+        isDirectory: isDirectory,
     }
 }
 function compare(a, b) {
@@ -349,7 +361,7 @@ const ReactNativeFileReader = {
     /**
      * 
      */
-    getMimeType: getMimetype,
+    parsePath: parsePath,
     compare: compare,
     /**
      * 
@@ -539,9 +551,8 @@ const ReactNativeFileReader = {
     getStat: async function(src) {
         try {
             const stat = await RNFS.stat(src);
-            const name = getName(stat.path);
-            const mimetype = stat.isFile() ? getMimetype(name) : null;
-            return Object.assign(stat, {name: name, type: mimetype});
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType});
         } catch(err) {
             throw err;
         }
@@ -557,12 +568,10 @@ const ReactNativeFileReader = {
             if (!encoding) {
                 encoding = DEFAULT_ENCODING;
             }
-
             const stat = await RNFS.stat(src);
-            const name = getName(stat.path);
-            const mimetype = stat.isFile() ? getMimetype(name) : null;
             const data = await RNFS.readFile(src, encoding);
-            return Object.assign(stat, {name: name, type: mimetype, data: data, encoding: encoding});
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType, data: data, encoding: encoding});
         } catch(err) {
             throw err;
         }
@@ -575,7 +584,6 @@ const ReactNativeFileReader = {
     getDir: async function(src) {
         try {
             const res = await RNFS.readDir(src);
-
             return res.sort(function(a, b) {
                 const t1 = a.isFile();
                 const t2 = b.isFile();
@@ -591,23 +599,20 @@ const ReactNativeFileReader = {
     },
     /**
      * 
-     * @param {String} contents 
+     * @param {String} data 
      * @param {String} dst 
      * @param {String} encoding 
      * @returns 
      */
-    saveFile: async function(contents, dst, encoding) {
+    saveFile: async function(data, dst, encoding) {
         try {
             if (!encoding) {
                 encoding = DEFAULT_ENCODING;
             }
-            
-            await RNFS.writeFile(dst, contents, encoding);
-
+            await RNFS.writeFile(dst, data, encoding);
             const stat = await RNFS.stat(dst);
-            const name = getName(stat.path);
-            const mimetype = stat.isFile() ? getMimetype(name) : null;
-            return Object.assign(stat, {name: name, type: mimetype});
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType});
         } catch(err) {
             throw err;
         }
@@ -621,11 +626,9 @@ const ReactNativeFileReader = {
     moveFile: async function(src, dst) {
         try {
             await RNFS.moveFile(src, dst);
-
             const stat = await RNFS.stat(dst);
-            const name = getName(stat.path);
-            const mimetype = stat.isFile() ? getMimetype(name) : null;
-            return Object.assign(stat, {name: name, type: mimetype});
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType});
         } catch(err) {
             throw err;
         }
@@ -638,12 +641,10 @@ const ReactNativeFileReader = {
     removeFile: async function(src) {
         try {
             const stat = await RNFS.stat(src);
-
             if (stat.isFile()) {
                 await RNFS.unlink(src);
                 return true;
             }
-            
             throw new Error("IsNotFile");
         } catch(err) {
             throw err;
@@ -657,10 +658,9 @@ const ReactNativeFileReader = {
     saveDir: async function(dst) {
         try {
             await RNFS.mkdir(dst);
-
             const stat = await RNFS.stat(dst);
-            const name = getName(stat.path);
-            return Object.assign(stat, {name: name, type: null});
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType});
         } catch(err) {
             throw err;
         }
@@ -673,12 +673,10 @@ const ReactNativeFileReader = {
     removeDir: async function(src) {
         try {
             const stat = await RNFS.stat(src);
-
             if (stat.isDirectory()) {
                 await RNFS.unlink(src);
                 return true;
             }
-
             throw new Error("IsNotDirectory");
         } catch(err) {
             throw err;
@@ -700,7 +698,7 @@ const ReactNativeFileReader = {
                 const name = keys[i];
                 const file = zip.files[name];
                 const isDir = /\/$/.test(name);
-                const mimetype = getMimetype(name);
+                const {fileName, mimeType} = parsePath(name);
                 let data;
                 try {
                     data = await file.async("base64");
@@ -709,7 +707,7 @@ const ReactNativeFileReader = {
                 }
                 if (isDir) {
                     res.push({
-                        name: name.replace(/\/$/, ""),
+                        name: fileName,
                         type: null,
                         size: null,
                         data: data,
@@ -720,8 +718,8 @@ const ReactNativeFileReader = {
                     });
                 } else {
                     res.push({
-                        name: name,
-                        type: mimetype,
+                        name: fileName,
+                        type: mimeType,
                         size: Math.round(getBase64Size(data)),
                         data: data,
                         uri: null,
