@@ -351,7 +351,7 @@ function compare(a, b) {
     } else {
         return 0;
     }
-}
+} 
 
 const ReactNativeFileReader = {
     /**
@@ -498,14 +498,13 @@ const ReactNativeFileReader = {
             });
     
             const res = await picked.reduce(async function(prev, curr) {
-                const {name, size, type, uri, fileCopyUri} = curr;
+                const {name, size, type, uri} = curr;
                 const data = await RNFS.readFile(uri, encoding);
                 prev.push({
                     name: name, 
                     size: size, 
                     type: type, 
-                    uri: uri, 
-                    fileCopyUri: uri,
+                    path: uri, 
                     encoding: encoding,
                     data: data
                 });
@@ -699,35 +698,25 @@ const ReactNativeFileReader = {
                 const file = zip.files[name];
                 const isDir = /\/$/.test(name);
                 const {fileName, mimeType} = parsePath(name);
-                let data;
-                try {
-                    data = await file.async("base64");
-                } catch(err) {
-                    data = "";
-                }
-                if (isDir) {
-                    res.push({
-                        name: fileName,
-                        type: null,
-                        size: null,
-                        data: data,
-                        uri: null,
-                        fileCopyUri: null,
-                        isDirectory: () => true,
-                        isFile: () => false,
-                    });
-                } else {
-                    res.push({
-                        name: fileName,
-                        type: mimeType,
-                        size: Math.round(getBase64Size(data)),
-                        data: data,
-                        uri: null,
-                        fileCopyUri: null,
-                        isDirectory: () => false,
-                        isFile: () => true,
-                    });
-                }
+                res.push({
+                    name: fileName,
+                    type: mimeType,
+                    size: null,
+                    data: null,
+                    encoding: null,
+                    path: "\.\/"+(isDir ? name.replace(/\/$/, "") : name),
+                    isDirectory: () => isDir,
+                    isFile: () => !isDir,
+                    extract: async function() {
+                        try {
+                            this.encoding = "base64";
+                            this.data = await file.async("base64");
+                            this.size = Math.round(getBase64Size(this.data));
+                        } catch(err) {
+                            throw err;
+                        }
+                    },
+                });
                 i++
             }
 

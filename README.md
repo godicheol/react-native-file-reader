@@ -31,4 +31,6 @@ const res = await RNFR.removeDir(path);
 
 ```js
 const res = await RNFR.unzip(path);
+await res[0].extract();
+const {data, size} = res[0];
 ```
