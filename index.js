@@ -704,7 +704,7 @@ const ReactNativeFileReader = {
                     size: null,
                     data: null,
                     encoding: null,
-                    path: "\.\/"+(isDir ? name.replace(/\/$/, "") : name),
+                    path: "\/"+(isDir ? name.replace(/\/$/, "") : name),
                     isDirectory: () => isDir,
                     isFile: () => !isDir,
                     extract: async function() {
