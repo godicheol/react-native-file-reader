@@ -684,6 +684,26 @@ const ReactNativeFileReader = {
      */
     unzip: async function(base64) {
         try {
+            const extract = async function() {
+                try {
+                    if (this.isFile()) {
+                        this.encoding = "base64";
+                        this.data = await this.__original__.async("base64");
+                        this.size = Math.round(getBase64Size(this.data));
+                        return this;
+                    } else {
+                        const len = this.children.length;
+                        let i = 0;
+                        while(i < len) {
+                            await this.children[i].extract();
+                            i++;
+                        }
+                        return this;
+                    }
+                } catch(err) {
+                    throw err;
+                }
+            }
             const zip = await JSZip.loadAsync(base64, {base64: true});
             let res = [{
                 name: "root",
@@ -693,26 +713,21 @@ const ReactNativeFileReader = {
                 encoding: null,
                 path: "\.",
                 children: [],
+                __original__: null,
                 isDirectory: () => true,
                 isFile: () => false,
-                extract: async function() {
-                    try {
-                        const len = this.children.length;
-                        let i = 0;
-                        while(i < len) {
-                            await this.children[i].extract();
-                            i++;
-                        }
-                        return this;
-                    } catch(err) {
-                        throw err;
-                    }
-                }
+                extract: extract,
             }];
+
+            Object.defineProperty(res[0], "__original__", {
+                enumerable: false,
+                writable: true
+            });
+
             for (const name in zip.files) {
                 const file = zip.files[name];
                 const {fileName, mimeType, isDirectory} = parsePath(name);
-                res.push({
+                const item = {
                     name: fileName,
                     type: mimeType,
                     size: null,
@@ -720,30 +735,15 @@ const ReactNativeFileReader = {
                     encoding: null,
                     path: isDirectory ? joinPath("\.", name.replace(/\/$/, "")) : joinPath("\.", name),
                     children: [],
+                    __original__: file,
                     isDirectory: () => isDirectory,
                     isFile: () => !isDirectory,
-                    extract: (isDirectory ? (async function() {
-                        try {
-                            const len = this.children.length;
-                            let i = 0;
-                            while(i < len) {
-                                await this.children[i].extract();
-                                i++;
-                            }
-                            return this;
-                        } catch(err) {
-                            throw err;
-                        }
-                    }) : (async function() {
-                        try {
-                            this.encoding = "base64";
-                            this.data = await file.async("base64");
-                            this.size = Math.round(getBase64Size(this.data));
-                            return this;
-                        } catch(err) {
-                            throw err;
-                        }
-                    })),
+                    extract: extract,
+                };
+                res.push(item);
+                Object.defineProperty(item, "__original__", {
+                    enumerable: false,
+                    writable: true
                 });
             }
 
