@@ -64,6 +64,31 @@ function getBase64Size(base64) {
     var p = (base64.charAt(base64.length - 2) === "\=") ? 2 : ((base64.charAt(base64.length - 1) === "\=") ? 1 : 0);
     return l * 0.75 - p;
 }
+function joinPath(...args) {
+    return args.reduce(function(prev, curr) {
+        return curr.replace(/\\+/g, "/")
+            .replace(/\/+/g, "/")
+            .split(/\//)
+            .reduce(function(p, c) {
+                if (c === "\.") {
+                    if (p.length > 0) {
+                        return p;
+                    } else {
+                        p.push(c);
+                    }
+                } else if (c === "\.\.") {
+                    if (p.length > 0) {
+                        p.pop();
+                    } else {
+                        p.push(c);
+                    }
+                } else {
+                    p.push(c);
+                }
+                return p;
+            }, prev);
+    }, []).join("\/") || "\.";
+}
 function parsePath(str) {
     const types = {
         'abs': 'audio/x-mpeg',
@@ -361,38 +386,9 @@ const ReactNativeFileReader = {
     /**
      * 
      */
+    joinPath: joinPath,
     parsePath: parsePath,
     compare: compare,
-    /**
-     * 
-     * @param  {...any} args 
-     * @returns 
-     */
-    join: function(...args) {
-        return args.reduce(function(prev, curr) {
-            return curr.replace(/\\+/g, "/")
-                .replace(/\/+/g, "/")
-                .split(/\//)
-                .reduce(function(p, c) {
-                    if (c === "\.") {
-                        if (p.length > 0) {
-                            return p;
-                        } else {
-                            p.push(c);
-                        }
-                    } else if (c === "\.\.") {
-                        if (p.length > 0) {
-                            p.pop();
-                        } else {
-                            p.push(c);
-                        }
-                    } else {
-                        p.push(c);
-                    }
-                    return p;
-                }, prev);
-        }, []).join("\/") || "\.";
-    },
     /**
      * 
      * @param {Array} arr 
@@ -689,35 +685,79 @@ const ReactNativeFileReader = {
     unzip: async function(base64) {
         try {
             const zip = await JSZip.loadAsync(base64, {base64: true});
-            const keys = Object.keys(zip.files);
-            const len = keys.length;
-            let i = 0;
-            let res = [];
-            while(i < len) {
-                const name = keys[i];
+            let res = [{
+                name: "root",
+                type: null,
+                size: null,
+                data: null,
+                encoding: null,
+                path: "\.",
+                children: [],
+                isDirectory: () => true,
+                isFile: () => false,
+                extract: async function() {
+                    try {
+                        const len = this.children.length;
+                        let i = 0;
+                        while(i < len) {
+                            await this.children[i].extract();
+                            i++;
+                        }
+                        return this;
+                    } catch(err) {
+                        throw err;
+                    }
+                }
+            }];
+            for (const name in zip.files) {
                 const file = zip.files[name];
-                const isDir = /\/$/.test(name);
-                const {fileName, mimeType} = parsePath(name);
+                const {fileName, mimeType, isDirectory} = parsePath(name);
                 res.push({
                     name: fileName,
                     type: mimeType,
                     size: null,
                     data: null,
                     encoding: null,
-                    path: "\/"+(isDir ? name.replace(/\/$/, "") : name),
-                    isDirectory: () => isDir,
-                    isFile: () => !isDir,
-                    extract: async function() {
+                    path: isDirectory ? joinPath("\.", name.replace(/\/$/, "")) : joinPath("\.", name),
+                    children: [],
+                    isDirectory: () => isDirectory,
+                    isFile: () => !isDirectory,
+                    extract: (isDirectory ? (async function() {
+                        try {
+                            const len = this.children.length;
+                            let i = 0;
+                            while(i < len) {
+                                await this.children[i].extract();
+                                i++;
+                            }
+                            return this;
+                        } catch(err) {
+                            throw err;
+                        }
+                    }) : (async function() {
                         try {
                             this.encoding = "base64";
                             this.data = await file.async("base64");
                             this.size = Math.round(getBase64Size(this.data));
+                            return this;
                         } catch(err) {
                             throw err;
                         }
-                    },
+                    })),
                 });
-                i++
+            }
+
+            for (const item of res) {
+                if (item.isFile()) {
+                    const dirPath = joinPath(item.path, "..");
+                    const dir = res.find(function(elem) {
+                        return elem.path === dirPath;
+                    });
+
+                    if (dir) {
+                        dir.children.push(item);
+                    }
+                }
             }
 
             return res.sort(function(a, b) {
@@ -729,6 +769,98 @@ const ReactNativeFileReader = {
                     return compare(a.name, b.name);
                 }
             });
+        } catch(err) {
+            throw err;
+        }
+    },
+    /**
+     * 
+     * @param {String} base64 
+     * @returns 
+     */
+    unzip2: async function(base64) {
+        try {
+            const zip = await JSZip.loadAsync(base64, {base64: true});
+            let res = {
+                ".": {
+                    children: [],
+                    extract: async function() {
+                        try {
+                            const len = this.children.length;
+                            let i = 0;
+                            while(i < len) {
+                                await this.children[i].extract();
+                                i++;
+                            }
+                            return this;
+                        } catch(err) {
+                            throw err;
+                        }
+                    }
+                }
+            };
+            let files = [];
+            for (const name in zip.files) {
+                const file = zip.files[name];
+                const {fileName, mimeType, isFile} = parsePath(name);
+                if (isFile) {
+                    files.push({
+                        name: fileName,
+                        type: mimeType,
+                        size: null,
+                        data: null,
+                        encoding: null,
+                        path: joinPath("\.", name),
+                        isDirectory: () => isDir,
+                        isFile: () => !isDir,
+                        extract: async function() {
+                            try {
+                                this.encoding = "base64";
+                                this.data = await file.async("base64");
+                                this.size = Math.round(getBase64Size(this.data));
+                                return this;
+                            } catch(err) {
+                                throw err;
+                            }
+                        },
+                    });
+                } else {
+                    const dirName = joinPath("\.", name.replace(/\/$/, ""));
+                    if (!res[dirName]) {
+                        res[dirName] = {
+                            children: [],
+                            extract: async function() {
+                                try {
+                                    const len = this.children.length;
+                                    let i = 0;
+                                    while(i < len) {
+                                        await this.children[i].extract();
+                                        i++;
+                                    }
+                                    return this;
+                                } catch(err) {
+                                    throw err;
+                                }
+                            }
+                        };
+                    }
+                }
+            }
+
+            for (const file of files) {
+                const dirName = joinPath(file.path, "..");
+                if (res[dirName]) {
+                    res[dirName].children.push(file);       
+                }
+            }
+
+            for (const dirName in res) {
+                res[dirName].children.sort(function(a, b) {
+                    return compare(a.name, b.name);
+                }); 
+            }
+            
+            return res;
         } catch(err) {
             throw err;
         }

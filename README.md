@@ -31,9 +31,19 @@ const res = await RNFR.removeDir(path);
 
 ```js
 const res = await RNFR.unzip(path);
-await res[0].extract();
-const {data, size} = res[0];
+if (res[0].isDirectory()) {
+    await res[0].extract();
+    const {data, size} = res[0].children[0];
+}
 ```
+
+```js
+const res = await RNFR.unzip2(path);
+// {"\.": { children: [File, File, File] } };
+await res["\."].extract();
+const {data, size} = res["\."].children[0];
+```
+
 
 ## Acknowledgements
 - [react-native-document-ficker](https://www.npmjs.com/package/react-native-document-picker)
