@@ -684,46 +684,8 @@ const ReactNativeFileReader = {
      */
     unzip: async function(base64) {
         try {
-            const extract = async function() {
-                try {
-                    if (this.isFile()) {
-                        this.encoding = "base64";
-                        this.data = await this.__original__.async("base64");
-                        this.size = Math.round(getBase64Size(this.data));
-                        return this;
-                    } else {
-                        const len = this.children.length;
-                        let i = 0;
-                        while(i < len) {
-                            await this.children[i].extract();
-                            i++;
-                        }
-                        return this;
-                    }
-                } catch(err) {
-                    throw err;
-                }
-            }
             const zip = await JSZip.loadAsync(base64, {base64: true});
-            let res = [{
-                name: "root",
-                type: null,
-                size: null,
-                data: null,
-                encoding: null,
-                path: "\.",
-                children: [],
-                __original__: null,
-                isDirectory: () => true,
-                isFile: () => false,
-                extract: extract,
-            }];
-
-            Object.defineProperty(res[0], "__original__", {
-                enumerable: false,
-                writable: true
-            });
-
+            
             for (const name in zip.files) {
                 const file = zip.files[name];
                 const {fileName, mimeType, isDirectory} = parsePath(name);
@@ -735,29 +697,20 @@ const ReactNativeFileReader = {
                     encoding: null,
                     path: isDirectory ? joinPath("\.", name.replace(/\/$/, "")) : joinPath("\.", name),
                     children: [],
-                    __original__: file,
                     isDirectory: () => isDirectory,
                     isFile: () => !isDirectory,
-                    extract: extract,
+                    extract: async function() {
+                        try {
+                            this.data = await file.async("base64");
+                            this.encoding = "base64";
+                            this.size = Math.round(getBase64Size(this.data));
+                            return this;
+                        } catch(err) {
+                            throw err;
+                        }
+                    },
                 };
                 res.push(item);
-                Object.defineProperty(item, "__original__", {
-                    enumerable: false,
-                    writable: true
-                });
-            }
-
-            for (const item of res) {
-                if (item.isFile()) {
-                    const dirPath = joinPath(item.path, "..");
-                    const dir = res.find(function(elem) {
-                        return elem.path === dirPath;
-                    });
-
-                    if (dir) {
-                        dir.children.push(item);
-                    }
-                }
             }
 
             return res.sort(function(a, b) {
@@ -769,98 +722,6 @@ const ReactNativeFileReader = {
                     return compare(a.name, b.name);
                 }
             });
-        } catch(err) {
-            throw err;
-        }
-    },
-    /**
-     * 
-     * @param {String} base64 
-     * @returns 
-     */
-    unzip2: async function(base64) {
-        try {
-            const zip = await JSZip.loadAsync(base64, {base64: true});
-            let res = {
-                ".": {
-                    children: [],
-                    extract: async function() {
-                        try {
-                            const len = this.children.length;
-                            let i = 0;
-                            while(i < len) {
-                                await this.children[i].extract();
-                                i++;
-                            }
-                            return this;
-                        } catch(err) {
-                            throw err;
-                        }
-                    }
-                }
-            };
-            let files = [];
-            for (const name in zip.files) {
-                const file = zip.files[name];
-                const {fileName, mimeType, isFile} = parsePath(name);
-                if (isFile) {
-                    files.push({
-                        name: fileName,
-                        type: mimeType,
-                        size: null,
-                        data: null,
-                        encoding: null,
-                        path: joinPath("\.", name),
-                        isDirectory: () => isDir,
-                        isFile: () => !isDir,
-                        extract: async function() {
-                            try {
-                                this.encoding = "base64";
-                                this.data = await file.async("base64");
-                                this.size = Math.round(getBase64Size(this.data));
-                                return this;
-                            } catch(err) {
-                                throw err;
-                            }
-                        },
-                    });
-                } else {
-                    const dirName = joinPath("\.", name.replace(/\/$/, ""));
-                    if (!res[dirName]) {
-                        res[dirName] = {
-                            children: [],
-                            extract: async function() {
-                                try {
-                                    const len = this.children.length;
-                                    let i = 0;
-                                    while(i < len) {
-                                        await this.children[i].extract();
-                                        i++;
-                                    }
-                                    return this;
-                                } catch(err) {
-                                    throw err;
-                                }
-                            }
-                        };
-                    }
-                }
-            }
-
-            for (const file of files) {
-                const dirName = joinPath(file.path, "..");
-                if (res[dirName]) {
-                    res[dirName].children.push(file);       
-                }
-            }
-
-            for (const dirName in res) {
-                res[dirName].children.sort(function(a, b) {
-                    return compare(a.name, b.name);
-                }); 
-            }
-            
-            return res;
         } catch(err) {
             throw err;
         }
