@@ -601,7 +601,7 @@ const ReactNativeFileReader = {
      */
     moveFile: async function(src, dst) {
         try {
-            if (RNFS.exists(dst)) {
+            if (await RNFS.exists(dst)) {
                 throw new Error("already exists");
             }
             await RNFS.moveFile(src, dst);
@@ -620,7 +620,7 @@ const ReactNativeFileReader = {
      */
     copyFile: async function(src, dst) {
         try {
-            if (RNFS.exists(dst)) {
+            if (await RNFS.exists(dst)) {
                 throw new Error("already exists");
             }
             await RNFS.copyFile(src, dst);
@@ -689,7 +689,7 @@ const ReactNativeFileReader = {
             }
         }
         try {
-            if (RNFS.exists(dst)) {
+            if (await RNFS.exists(dst)) {
                 throw new Error("already exists");
             }
             await recursiveFunc(src, dst);
@@ -726,7 +726,7 @@ const ReactNativeFileReader = {
             }
         }
         try {
-            if (RNFS.exists(dst)) {
+            if (await RNFS.exists(dst)) {
                 throw new Error("already exists");
             }
             await recursiveFunc(src, dst);
