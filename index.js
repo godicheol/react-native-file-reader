@@ -65,29 +65,19 @@ function getBase64Size(base64) {
     return l * 0.75 - p;
 }
 function joinPath(...args) {
-    return args.reduce(function(prev, curr) {
-        return curr.replace(/\\+/g, "/")
-            .replace(/\/+/g, "/")
-            .split(/\//)
-            .reduce(function(p, c) {
-                if (c === "\.") {
-                    if (p.length > 0) {
-                        return p;
-                    } else {
-                        p.push(c);
-                    }
-                } else if (c === "\.\.") {
-                    if (p.length > 0) {
-                        p.pop();
-                    } else {
-                        p.push(c);
-                    }
-                } else {
-                    p.push(c);
-                }
-                return p;
-            }, prev);
-    }, []).join("\/") || "\.";
+    return args.join("\/")
+        .replace(/\/+|\\+/g, "\/")
+        .split("\/")
+        .reduce(function(prev, curr) {
+            if (curr === "\." && prev.length > 0) {
+                return prev;
+            } else if (curr === "\.\." && prev.length > 0) {
+                prev.pop();
+            } else {
+                prev.push(curr);
+            }
+            return prev;
+        }, []).join("\/") || "\.";
 }
 function parsePath(str) {
     const types = {
@@ -380,7 +370,7 @@ function compare(a, b) {
 
 const ReactNativeFileReader = {
     /**
-     * root, cache, download
+     * main, cache, download
      */
     PATH: DEFAULT_PATH,
     /**
@@ -389,15 +379,6 @@ const ReactNativeFileReader = {
     joinPath: joinPath,
     parsePath: parsePath,
     compare: compare,
-    /**
-     * 
-     * @param {Array} arr 
-     * @param {Function} func 
-     * @returns 
-     */
-    sort: function(arr, func) {
-        return arr.sort(compareString);
-    },
     /**
      * 
      * @returns 
