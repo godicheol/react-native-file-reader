@@ -685,7 +685,7 @@ const ReactNativeFileReader = {
     unzip: async function(base64) {
         try {
             const zip = await JSZip.loadAsync(base64, {base64: true});
-            
+
             for (const name in zip.files) {
                 const file = zip.files[name];
                 const {fileName, mimeType, isDirectory} = parsePath(name);
@@ -696,7 +696,6 @@ const ReactNativeFileReader = {
                     data: null,
                     encoding: null,
                     path: isDirectory ? joinPath("\.", name.replace(/\/$/, "")) : joinPath("\.", name),
-                    children: [],
                     isDirectory: () => isDirectory,
                     isFile: () => !isDirectory,
                     extract: async function() {
