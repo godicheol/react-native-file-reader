@@ -45,13 +45,13 @@ function getPath() {
     switch(Platform.OS) {
         case "ios":
             return {
-                root: RNFS.MainBundlePath,
+                main: RNFS.MainBundlePath,
                 cache: RNFS.CachesDirectoryPath,
                 download: RNFS.LibraryDirectoryPath,
             }
         case "android":
             return {
-                root: RNFS.DocumentDirectoryPath,
+                main: RNFS.DocumentDirectoryPath,
                 cache: RNFS.CachesDirectoryPath,
                 download: RNFS.DownloadDirectoryPath,
             }
