@@ -517,7 +517,7 @@ const ReactNativeFileReader = {
         }
     },
     /**
-     * deprecated
+     * permission error.
      */
     pickDir: async function() {
         try {
