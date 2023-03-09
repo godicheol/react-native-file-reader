@@ -10,27 +10,20 @@ const res = await RNFR.pickFile({
 ```
 
 ```js
+const res = await RNFR.isDir(path);
+const res = await RNFR.isFile(path);
+const res = await RNFR.getStat(path);
 const res = await RNFR.getFile(path); // base64
-```
-
-```js
 const res = await RNFR.getDir(path);
-```
-
-```js
 const res = await RNFR.saveFile(data, path); // base64
-```
-
-```js
+const res = await RNFR.moveFile(src, dst);
+const res = await RNFR.copyFile(src, dst);
+const res = await RNFR.removeFile(path);
 const res = await RNFR.saveDir(path);
-```
-
-```js
+const res = await RNFR.moveDir(src, dst);
+const res = await RNFR.copyDir(src, dst);
 const res = await RNFR.removeDir(path);
-```
-
-```js
-const res = await RNFR.unzip(path);
+const res = await RNFR.unzip(base64);
 ```
 
 ## Acknowledgements

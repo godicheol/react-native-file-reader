@@ -517,7 +517,7 @@ const ReactNativeFileReader = {
         }
     },
     /**
-     * 
+     * deprecated
      */
     pickDir: async function() {
         try {
@@ -620,7 +620,29 @@ const ReactNativeFileReader = {
      */
     moveFile: async function(src, dst) {
         try {
+            if (RNFS.exists(dst)) {
+                throw new Error("already exists");
+            }
             await RNFS.moveFile(src, dst);
+            const stat = await RNFS.stat(dst);
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType});
+        } catch(err) {
+            throw err;
+        }
+    },
+    /**
+     * 
+     * @param {String} src 
+     * @param {String} dst 
+     * @returns 
+     */
+    copyFile: async function(src, dst) {
+        try {
+            if (RNFS.exists(dst)) {
+                throw new Error("already exists");
+            }
+            await RNFS.copyFile(src, dst);
             const stat = await RNFS.stat(dst);
             const {fileName, mimeType} = parsePath(stat.path);
             return Object.assign(stat, {name: fileName, type: mimeType});
@@ -640,7 +662,7 @@ const ReactNativeFileReader = {
                 await RNFS.unlink(src);
                 return true;
             }
-            throw new Error("IsNotFile");
+            throw new Error("not file");
         } catch(err) {
             throw err;
         }
@@ -663,6 +685,80 @@ const ReactNativeFileReader = {
     /**
      * 
      * @param {String} src 
+     * @param {String} dst 
+     * @returns 
+     */
+    moveDir: async function(src, dst) {
+        const recursiveFunc = async function(source, destination) {
+            try {
+                const items = await RNFS.readDir(source);
+                await RNFS.mkdir(destination);
+                for (const item of items) {
+                    if (item.isFile()) {
+                        const dstFilePath = destination + '/' + item.name;
+                        await RNFS.moveFile(item.path, dstFilePath);
+                    } else {
+                        const dirPath = source + '/' + item.name;
+                        const dstDirPath = destination + '/' + item.name;
+                        await recursiveFunc(dirPath, dstDirPath)
+                    }
+                }
+            } catch(err) {
+                throw err;
+            }
+        }
+        try {
+            if (RNFS.exists(dst)) {
+                throw new Error("already exists");
+            }
+            await recursiveFunc(src, dst);
+            const stat = await RNFS.stat(dst);
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType});
+        } catch(err) {
+            throw err;
+        }
+    },
+    /**
+     * 
+     * @param {String} src 
+     * @param {String} dst 
+     * @returns 
+     */
+    copyDir: async function(src, dst) {
+        const recursiveFunc = async function(source, destination) {
+            try {
+                const items = await RNFS.readDir(source);
+                await RNFS.mkdir(destination);
+                for (const item of items) {
+                    if (item.isFile()) {
+                        const dstFilePath = destination + '/' + item.name;
+                        await RNFS.copyFile(item.path, dstFilePath);
+                    } else {
+                        const dirPath = source + '/' + item.name;
+                        const dstDirPath = destination + '/' + item.name;
+                        await recursiveFunc(dirPath, dstDirPath)
+                    }
+                }
+            } catch(err) {
+                throw err;
+            }
+        }
+        try {
+            if (RNFS.exists(dst)) {
+                throw new Error("already exists");
+            }
+            await recursiveFunc(src, dst);
+            const stat = await RNFS.stat(dst);
+            const {fileName, mimeType} = parsePath(stat.path);
+            return Object.assign(stat, {name: fileName, type: mimeType});
+        } catch(err) {
+            throw err;
+        }
+    },
+    /**
+     * 
+     * @param {String} src 
      * @returns 
      */
     removeDir: async function(src) {
@@ -672,7 +768,7 @@ const ReactNativeFileReader = {
                 await RNFS.unlink(src);
                 return true;
             }
-            throw new Error("IsNotDirectory");
+            throw new Error("not directory");
         } catch(err) {
             throw err;
         }
